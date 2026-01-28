@@ -104,7 +104,9 @@ This tool is for educational purposes. Use responsibly and in accordance with Gi
 Illusivehacks
 
 GitHub: @Illusivehacks
+
 Tool Version: 3.5
+
 Last Updated: 2026
 
 
