@@ -5,7 +5,9 @@ Github Mass Following and Unfollowing script. This is for educational purposes o
 
 # Clone the repository
 git clone https://github.com/Illusivehacks/Github_Mass_Following.git
+
 cd Github_Mass_Following
+
 ls 
 
 # Install requirements
