@@ -4,11 +4,12 @@ Github Mass Following and Unfollowing script. This is for educational purposes o
 # Installation
 
 # Clone the repository
-git clone 
-cd 
+git clone https://github.com/Illusivehacks/Github_Mass_Following.git
+cd Github_Mass_Following
+ls 
 
 # Install requirements
-pip install requests
+pip install -r requirements.txt
 
 # Run the tool
 python github_tool.py
