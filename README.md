@@ -66,8 +66,11 @@ Use responsibly - avoid spam-like behavior.
 
 ## What NOT to Do
 ❌ Don't unfollow hundreds at once.
+
 ❌ Don't use minimal delays.
+
 ❌ Don't ignore rate limit warnings.
+
 ❌ Don't use for spam or harassment.
 
 
