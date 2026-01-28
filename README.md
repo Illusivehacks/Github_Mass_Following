@@ -69,19 +69,19 @@ Use responsibly - avoid spam-like behavior.
 
 
 # ❓ FAQ
-# Q: Is this against GitHub ToS?
+Q: Is this against GitHub ToS?
 A: No, when used responsibly. The tool respects rate limits and is for legitimate account management.
 
-# Q: Can I get banned?
+Q: Can I get banned?
 A: Only if you abuse the API. Follow the safety guidelines and use reasonable delays.
 
-# Q: How many users can I unfollow at once?
+Q: How many users can I unfollow at once?
 A: Start with 20-50, monitor results and adjust. Never do hundreds at once.
 
-# Q: Does it work with private accounts?
+ Q: Does it work with private accounts?
 A: It works with whatever your token permissions allow. Public repos and user info require appropriate scopes.
 
-## Q: Can I automate following?
+ Q: Can I automate following?
 A: Yes, but use with caution. Always verify users exist and add delays.
 
 # 🤝 Contributing
