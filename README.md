@@ -1,6 +1,8 @@
 # GitHub Automation Tool (Mass Following and Unfollowing) v3.5 ⚡
 Github Mass Following and Unfollowing script. This is for educational purposes only!!!.
 
+![Screenshot Placeholder](GUI.png)
+
 # Installation
 
 # Clone the repository
@@ -25,6 +27,8 @@ python github_tool.py
 3. Choose "Login with Personal Access Token (Fine-grained tokens)"
 
 4. Enter your token
+
+![Screenshot Placeholder](login.png)
 
 # 🚀 Features
 ✅ Followback Analyzer
@@ -51,6 +55,7 @@ Repository Info: Detailed analytics for any repo.
 Fork Support: Fork repositories to your account.
 Language Stats: Repository language distribution.
 
+![Screenshot Placeholder](followback.png)
 
 # ⚠️ Important Warnings
 Rate Limits
