@@ -81,7 +81,7 @@ A: Start with 20-50, monitor results and adjust. Never do hundreds at once.
 # Q: Does it work with private accounts?
 A: It works with whatever your token permissions allow. Public repos and user info require appropriate scopes.
 
-# Q: Can I automate following?
+## Q: Can I automate following?
 A: Yes, but use with caution. Always verify users exist and add delays.
 
 # 🤝 Contributing
