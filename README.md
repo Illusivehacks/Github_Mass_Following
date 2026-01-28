@@ -55,13 +55,13 @@ GitHub API: 5000 requests per hour (authenticated).
 Search API: 30 requests per minute.
 Tool Protection: Built-in delays and limit checking.
 
-# Safety Guidelines
+## Safety Guidelines
 Max 50 unfollows per session recommended.
 10-30 second delays between actions.
 Check rate limits before bulk operations.
 Use responsibly - avoid spam-like behavior.
 
-# What NOT to Do
+## What NOT to Do
 ❌ Don't unfollow hundreds at once.
 ❌ Don't use minimal delays.
 ❌ Don't ignore rate limit warnings.
