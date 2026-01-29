@@ -20,7 +20,7 @@ python github_tool.py
 
 
 # Login with Token
-1. Get your GitHub token: https://github.com/settings/developers
+1. Get your GitHub token: https://github.com/settings/developers (Ensure to set/add all permissions)
 
 2. Select option 1 from main menu
 
