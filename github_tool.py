@@ -150,8 +150,9 @@ class GitHubTool:
         print(f"{Colors.RESET}")
         print(f"{Colors.BRIGHT_CYAN}{'='*70}{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}┌────────────────────────────────────────────────────────────┐{Colors.RESET}")
-        print(f"{Colors.BRIGHT_GREEN}│{Colors.BRIGHT_CYAN}             GITHUB TOOL v3.5 - Followback Cleaner     {Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.BRIGHT_CYAN}             GITHUB TOOL v3.6      {Colors.BRIGHT_GREEN}{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}│{Colors.BRIGHT_YELLOW}     Developed with  ❤️ by Illusivehacks         {Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.BRIGHT_CYAN}     NEW: Seed User Follower Extractor            {Colors.BRIGHT_GREEN}{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}└────────────────────────────────────────────────────────────┘{Colors.RESET}\n")
     
     def print_header(self, text: str, color: str = Colors.BRIGHT_CYAN):
@@ -554,6 +555,401 @@ class GitHubTool:
         except Exception as e:
             logger.error(f"Error getting repo info: {e}")
             return None
+    
+    # NEW FUNCTIONALITY: Seed User Follower Extractor
+    def get_followers_for_user(self, username: str, max_followers: int = 1000) -> List[str]:
+        """Get all followers of a specific user"""
+        try:
+            self.print_info(f"Fetching followers for @{username}...")
+            followers = []
+            page = 1
+            per_page = 100  # Max per page
+            
+            while True:
+                url = f"{self.api_url}/users/{username}/followers?page={page}&per_page={per_page}"
+                response = self.session.get(url)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if not data:
+                        break
+                    
+                    for user in data:
+                        followers.append(user['login'])
+                    
+                    self.print_info(f"Loaded {len(followers)} followers for @{username}...")
+                    
+                    # Check rate limit
+                    rate_response = self.session.get(f"{self.api_url}/rate_limit")
+                    if rate_response.status_code == 200:
+                        rate_data = rate_response.json()
+                        remaining = rate_data['resources']['core']['remaining']
+                        if remaining < 50:
+                            self.print_warning(f"Low API rate limit: {remaining} requests remaining")
+                    
+                    page += 1
+                    
+                    # Add small delay to avoid rate limiting
+                    time.sleep(0.5)
+                    
+                    # Safety limit
+                    if len(followers) >= max_followers:
+                        self.print_warning(f"Reached safety limit of {max_followers} followers for @{username}")
+                        break
+                    
+                elif response.status_code == 403:
+                    self.print_error("Rate limited while fetching followers")
+                    break
+                elif response.status_code == 404:
+                    self.print_error(f"User @{username} not found")
+                    break
+                else:
+                    self.print_error(f"Failed to fetch followers: HTTP {response.status_code}")
+                    break
+            
+            return followers
+            
+        except Exception as e:
+            self.print_error(f"Error getting followers for @{username}: {str(e)}")
+            return []
+    
+    def handle_seed_follower_extractor_flow(self):
+        """Handle the seed user follower extraction flow"""
+        if not self.username or not self.access_token:
+            self.print_error("Please login with access token first!")
+            return
+        
+        self.print_header("SEED USER FOLLOWER EXTRACTOR")
+        
+        print(f"\n{Colors.BRIGHT_CYAN}{'─' * 60}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_MAGENTA}✨ Instructions ✨{Colors.RESET}")
+        print(f"{Colors.BRIGHT_CYAN}{'─' * 60}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_WHITE}• Enter seed usernames (1-5 users)")
+        print(f"• Type 'done' when finished")
+        print(f"• The tool will extract all followers from each seed user")
+        print(f"• Followers will be combined into one unique list")
+        print(f"• You can then choose to follow the entire list{Colors.RESET}")
+        print(f"{Colors.BRIGHT_CYAN}{'─' * 60}{Colors.RESET}\n")
+        
+        # Get seed users
+        seed_users = []
+        print(f"{Colors.BRIGHT_GREEN}[1/3]{Colors.RESET} {Colors.BRIGHT_WHITE}Enter Seed Users{Colors.RESET}\n")
+        
+        while True:
+            if len(seed_users) >= 5:
+                self.print_info("Maximum of 5 seed users reached.")
+                choice = self.get_input("Type 'done' to continue or 'list' to see current users: ")
+                if choice.lower() == 'done':
+                    break
+                elif choice.lower() == 'list':
+                    self.display_seed_users(seed_users)
+                    continue
+            
+            username = self.get_input(f"Seed user {len(seed_users) + 1} (or 'done' when finished): ").strip()
+            
+            if username.lower() == 'done':
+                if len(seed_users) == 0:
+                    self.print_warning("Please enter at least one seed user!")
+                    continue
+                break
+            elif username.lower() == 'list':
+                self.display_seed_users(seed_users)
+                continue
+            elif username.lower() == 'clear':
+                seed_users = []
+                self.print_success("List cleared!")
+                continue
+            elif not username:
+                self.print_warning("Username cannot be empty!")
+                continue
+            elif username in seed_users:
+                self.print_warning(f"@{username} is already in the list!")
+                continue
+            elif not self.verify_user_exists(username):
+                self.print_warning(f"@{username} doesn't seem to exist!")
+                continue
+            else:
+                seed_users.append(username)
+                self.print_success(f"Added @{username} to seed users list")
+        
+        # Extract followers from seed users
+        print(f"\n{Colors.BRIGHT_GREEN}[2/3]{Colors.RESET} {Colors.BRIGHT_WHITE}Extracting Followers{Colors.RESET}\n")
+        
+        all_followers = []
+        follower_sources = {}
+        
+        for i, seed_user in enumerate(seed_users, 1):
+            self.print_info(f"Processing seed user {i}/{len(seed_users)}: @{seed_user}")
+            followers = self.get_followers_for_user(seed_user)
+            
+            # Track which followers came from which seed users
+            for follower in followers:
+                if follower not in follower_sources:
+                    follower_sources[follower] = []
+                follower_sources[follower].append(seed_user)
+            
+            # Add to combined list (avoiding duplicates)
+            new_followers = [f for f in followers if f not in all_followers]
+            all_followers.extend(new_followers)
+            
+            self.print_success(f"Found {len(followers)} followers for @{seed_user} ({len(new_followers)} new unique followers)")
+            
+            # Add delay between users to avoid rate limiting
+            if i < len(seed_users):
+                self.print_info("Taking a short break before next user...")
+                time.sleep(2)
+        
+        # Display results
+        print(f"\n{Colors.BRIGHT_GREEN}[3/3]{Colors.RESET} {Colors.BRIGHT_WHITE}Results Summary{Colors.RESET}\n")
+        
+        self.display_follower_extraction_results(seed_users, all_followers, follower_sources)
+        
+        # Ask if user wants to follow the list
+        print(f"\n{Colors.BRIGHT_CYAN}{'─' * 60}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_MAGENTA}✨ Follow Options ✨{Colors.RESET}")
+        print(f"{Colors.BRIGHT_CYAN}{'─' * 60}{Colors.RESET}")
+        
+        if not all_followers:
+            self.print_error("No followers extracted!")
+            return
+        
+        print(f"\n{Colors.BRIGHT_WHITE}Would you like to follow the extracted followers?{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}[1]{Colors.RESET} {Colors.BRIGHT_WHITE}Follow all {len(all_followers)} extracted followers{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}[2]{Colors.RESET} {Colors.BRIGHT_WHITE}Follow a specific number of followers{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}[3]{Colors.RESET} {Colors.BRIGHT_WHITE}Save followers to a file{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}[4]{Colors.RESET} {Colors.BRIGHT_WHITE}Exit without following{Colors.RESET}")
+        
+        choice = self.get_input("\nSelect option (1-4)")
+        
+        if choice == '1':
+            self.follow_extracted_followers(all_followers)
+        elif choice == '2':
+            max_follow = self.get_input(f"How many followers to follow? (1-{len(all_followers)}): ")
+            try:
+                max_follow = int(max_follow)
+                if max_follow < 1:
+                    max_follow = 1
+                elif max_follow > len(all_followers):
+                    max_follow = len(all_followers)
+                
+                followers_to_follow = all_followers[:max_follow]
+                self.follow_extracted_followers(followers_to_follow)
+            except ValueError:
+                self.print_error("Invalid number!")
+        elif choice == '3':
+            self.save_followers_to_file(all_followers, seed_users)
+        elif choice == '4':
+            self.print_info("Exiting without following.")
+        else:
+            self.print_error("Invalid option!")
+    
+    def display_seed_users(self, seed_users: List[str]):
+        """Display current seed users"""
+        if not seed_users:
+            self.print_info("No seed users added yet.")
+            return
+        
+        print(f"\n{Colors.BRIGHT_GREEN}Current Seed Users ({len(seed_users)}):{Colors.RESET}")
+        for i, user in enumerate(seed_users, 1):
+            print(f"  {Colors.BRIGHT_YELLOW}{i}.{Colors.RESET} @{user}")
+    
+    def display_follower_extraction_results(self, seed_users: List[str], all_followers: List[str], follower_sources: Dict):
+        """Display the follower extraction results"""
+        print(f"{Colors.BRIGHT_GREEN}┌────────────────────────────────────────────────────────────┐{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.BRIGHT_CYAN}            Follower Extraction Results              {Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}├────────────────────────────────────────────────────────────┤{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_WHITE}Seed Users:{Colors.RESET} {len(seed_users):>2}{Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_WHITE}Unique Followers Found:{Colors.RESET} {len(all_followers):>2}{Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}└────────────────────────────────────────────────────────────┘{Colors.RESET}")
+        
+        # Show seed user breakdown
+        print(f"\n{Colors.BRIGHT_CYAN}{'─' * 40}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_MAGENTA}Seed User Breakdown{Colors.RESET}")
+        print(f"{Colors.BRIGHT_CYAN}{'─' * 40}{Colors.RESET}")
+        
+        for i, seed_user in enumerate(seed_users, 1):
+            # Count followers from this seed user
+            followers_from_seed = sum(1 for sources in follower_sources.values() if seed_user in sources)
+            print(f"{Colors.BRIGHT_YELLOW}{i}.{Colors.RESET} @{seed_user:<20} {Colors.BRIGHT_WHITE}{followers_from_seed:>3} followers{Colors.RESET}")
+        
+        # Show follower overlap
+        print(f"\n{Colors.BRIGHT_CYAN}{'─' * 40}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_MAGENTA}Follower Overlap Analysis{Colors.RESET}")
+        print(f"{Colors.BRIGHT_CYAN}{'─' * 40}{Colors.RESET}")
+        
+        overlap_stats = {}
+        for follower, sources in follower_sources.items():
+            source_count = len(sources)
+            if source_count not in overlap_stats:
+                overlap_stats[source_count] = 0
+            overlap_stats[source_count] += 1
+        
+        for source_count in sorted(overlap_stats.keys(), reverse=True):
+            count = overlap_stats[source_count]
+            percentage = (count / len(all_followers)) * 100
+            source_text = f"{source_count} seed user{'s' if source_count > 1 else ''}"
+            print(f"{Colors.BRIGHT_YELLOW}{source_count}.{Colors.RESET} {Colors.BRIGHT_WHITE}{count:>3} followers{Colors.RESET} from {source_text} ({percentage:.1f}%)")
+        
+        # Display first 20 followers
+        if all_followers:
+            print(f"\n{Colors.BRIGHT_CYAN}{'─' * 40}{Colors.RESET}")
+            print(f"{Colors.BRIGHT_MAGENTA}Sample of Extracted Followers (First 20){Colors.RESET}")
+            print(f"{Colors.BRIGHT_CYAN}{'─' * 40}{Colors.RESET}")
+            
+            for i, follower in enumerate(all_followers[:20], 1):
+                sources = follower_sources.get(follower, [])
+                source_text = f"(from: {', '.join([f'@{s}' for s in sources])})" if sources else ""
+                print(f"{Colors.BRIGHT_YELLOW}{i:2}.{Colors.RESET} @{follower:<20} {Colors.DIM}{source_text}{Colors.RESET}")
+            
+            if len(all_followers) > 20:
+                print(f"{Colors.DIM}... and {len(all_followers) - 20} more followers{Colors.RESET}")
+    
+    def follow_extracted_followers(self, followers_to_follow: List[str]):
+        """Follow extracted followers with configurable delay"""
+        if not followers_to_follow:
+            self.print_error("No followers to follow!")
+            return
+        
+        print(f"\n{Colors.BRIGHT_CYAN}{'─' * 60}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_MAGENTA}✨ Follow Configuration ✨{Colors.RESET}")
+        print(f"{Colors.BRIGHT_CYAN}{'─' * 60}{Colors.RESET}")
+        
+        # Get delay settings
+        min_delay = self.get_input("Minimum delay between follows (seconds, 10-30 recommended): ")
+        max_delay = self.get_input("Maximum delay between follows (seconds, 10-30 recommended): ")
+        
+        try:
+            min_delay = int(min_delay) if min_delay else 10
+            max_delay = int(max_delay) if max_delay else 30
+            
+            if min_delay < 1:
+                min_delay = 1
+            if max_delay < min_delay:
+                max_delay = min_delay + 5
+            if max_delay > 300:  # 5 minutes max
+                max_delay = 300
+            
+            # Show summary
+            print(f"\n{Colors.BRIGHT_WHITE}Follow Summary:{Colors.RESET}")
+            print(f"{Colors.BRIGHT_YELLOW}• Total followers to follow:{Colors.RESET} {len(followers_to_follow)}")
+            print(f"{Colors.BRIGHT_YELLOW}• Delay range:{Colors.RESET} {min_delay}-{max_delay} seconds")
+            print(f"{Colors.BRIGHT_YELLOW}• Estimated time:{Colors.RESET} {len(followers_to_follow) * ((min_delay + max_delay) / 2) / 60:.1f} minutes")
+            print(f"{Colors.BRIGHT_YELLOW}• Your account:{Colors.RESET} @{self.username}")
+            
+            # Warning
+            print(f"\n{Colors.BRIGHT_RED}{'!' * 60}{Colors.RESET}")
+            print(f"{Colors.BRIGHT_RED}{Colors.BOLD}⚠️  IMPORTANT WARNING:{Colors.RESET}")
+            print(f"{Colors.BRIGHT_RED}{'!' * 60}{Colors.RESET}")
+            print(f"{Colors.BRIGHT_YELLOW}• Following {len(followers_to_follow)} users may look suspicious{Colors.RESET}")
+            print(f"{Colors.BRIGHT_YELLOW}• GitHub may temporarily limit your account{Colors.RESET}")
+            print(f"{Colors.BRIGHT_YELLOW}• Recommended: Follow max 50 users per session{Colors.RESET}")
+            print(f"{Colors.BRIGHT_YELLOW}• Consider breaking into smaller batches{Colors.RESET}")
+            
+            confirm = self.get_input(f"\nAre you SURE you want to follow {len(followers_to_follow)} users? (y/N): ").lower()
+            
+            if confirm == 'y':
+                self.bulk_follow_extracted_users(followers_to_follow, min_delay, max_delay)
+            else:
+                self.print_info("Follow operation cancelled")
+                
+        except ValueError:
+            self.print_error("Invalid delay values!")
+    
+    def bulk_follow_extracted_users(self, usernames: List[str], min_delay: int = 10, max_delay: int = 30):
+        """Follow multiple users with random delay between each follow"""
+        results = {
+            'successful': [],
+            'failed': [],
+            'total': len(usernames)
+        }
+        
+        self.print_header("FOLLOWING EXTRACTED FOLLOWERS")
+        print(f"{Colors.BRIGHT_CYAN}📋 Following {len(usernames)} users with {min_delay}-{max_delay}s delay{Colors.RESET}\n")
+        
+        for i, username in enumerate(usernames, 1):
+            print(f"\n{Colors.BRIGHT_CYAN}[{i}/{len(usernames)}]{Colors.RESET} Processing @{username}")
+            
+            success, message = self.follow_user(username)
+            
+            if success:
+                self.print_success(f"Followed @{username}")
+                results['successful'].append({
+                    'username': username,
+                    'message': message
+                })
+            else:
+                self.print_error(f"Failed to follow @{username}: {message}")
+                results['failed'].append({
+                    'username': username,
+                    'message': message
+                })
+            
+            # Add random delay between follows (except after the last one)
+            if i < len(usernames):
+                delay = random.randint(min_delay, max_delay)
+                print(f"{Colors.DIM}Waiting {delay} seconds before next follow...{Colors.RESET}")
+                for sec in range(delay, 0, -1):
+                    sys.stdout.write(f"\r{Colors.DIM}Next follow in {sec} seconds...{' ' * 10}{Colors.RESET}")
+                    sys.stdout.flush()
+                    time.sleep(1)
+                sys.stdout.write('\r' + ' ' * 40 + '\r')
+        
+        # Display results
+        self.print_header("FOLLOW RESULTS")
+        
+        print(f"{Colors.BRIGHT_GREEN}┌────────────────────────────────────────────────────────────┐{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.BRIGHT_CYAN}                    Results Summary                     {Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}├────────────────────────────────────────────────────────────┤{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_GREEN}✅ Successful:{Colors.RESET} {len(results['successful']):>3}/{results['total']:<45}{Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_RED}❌ Failed:{Colors.RESET}     {len(results['failed']):>3}/{results['total']:<45}{Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_CYAN}📊 Success Rate:{Colors.RESET} {(len(results['successful'])/results['total']*100):>6.1f}%{Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}└────────────────────────────────────────────────────────────┘{Colors.RESET}")
+        
+        if results['failed']:
+            print(f"\n{Colors.BRIGHT_YELLOW}Failed users (first 10 shown):{Colors.RESET}")
+            for fail in results['failed'][:10]:
+                print(f"  {Colors.DIM}@{fail['username']}: {fail['message']}{Colors.RESET}")
+        
+        # Save results to file
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"github_follow_results_{timestamp}.txt"
+        
+        with open(filename, 'w') as f:
+            f.write(f"GitHub Follow Results - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Total attempted: {results['total']}\n")
+            f.write(f"Successful: {len(results['successful'])}\n")
+            f.write(f"Failed: {len(results['failed'])}\n")
+            f.write(f"Success rate: {(len(results['successful'])/results['total']*100):.1f}%\n\n")
+            
+            f.write("Successful follows:\n")
+            for success in results['successful']:
+                f.write(f"@{success['username']}\n")
+            
+            f.write("\nFailed follows:\n")
+            for fail in results['failed']:
+                f.write(f"@{fail['username']}: {fail['message']}\n")
+        
+        self.print_success(f"Results saved to: {filename}")
+    
+    def save_followers_to_file(self, followers: List[str], seed_users: List[str]):
+        """Save extracted followers to a file"""
+        if not followers:
+            self.print_error("No followers to save!")
+            return
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"github_followers_{timestamp}.txt"
+        
+        with open(filename, 'w') as f:
+            f.write(f"GitHub Followers Extracted - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Seed Users: {', '.join([f'@{user}' for user in seed_users])}\n")
+            f.write(f"Total unique followers: {len(followers)}\n\n")
+            
+            f.write("Extracted Followers:\n")
+            for i, follower in enumerate(followers, 1):
+                f.write(f"{i}. @{follower}\n")
+        
+        self.print_success(f"Saved {len(followers)} followers to: {filename}")
     
     # Followback 
     
@@ -1348,7 +1744,7 @@ class GitHubTool:
         choice = self.get_input("\nSelect option (1-3)")
         
         if choice == '1':
-            self.print_info("Get your token from: https://github.com/settings/tokens")
+            self.print_info("Get your token from: https://github.com/settings/developers")
             self.print_info("Required scopes: user, public_repo")
             
             token = self.get_input("Personal Access Token: ", Colors.BRIGHT_RED, password=True)
@@ -1720,8 +2116,9 @@ class GitHubTool:
         print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}3.{Colors.RESET} {Colors.BRIGHT_WHITE}Follow/Unfollow Users{Colors.RESET}                          {Colors.BRIGHT_GREEN}{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}4.{Colors.RESET} {Colors.BRIGHT_WHITE}Repository Operations{Colors.RESET}                          {Colors.BRIGHT_GREEN}{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}5.{Colors.RESET} {Colors.BRIGHT_WHITE}Followback Checker & Cleaner{Colors.RESET}                  {Colors.BRIGHT_GREEN}{Colors.RESET}")
-        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}6.{Colors.RESET} {Colors.BRIGHT_WHITE}Check Rate Limits{Colors.RESET}                              {Colors.BRIGHT_GREEN}{Colors.RESET}")
-        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}7.{Colors.RESET} {Colors.BRIGHT_WHITE}Exit Tool{Colors.RESET}                                      {Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}6.{Colors.RESET} {Colors.BRIGHT_WHITE}Seed User Follower Extractor{Colors.RESET}                   {Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}7.{Colors.RESET} {Colors.BRIGHT_WHITE}Check Rate Limits{Colors.RESET}                              {Colors.BRIGHT_GREEN}{Colors.RESET}")
+        print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_YELLOW}8.{Colors.RESET} {Colors.BRIGHT_WHITE}Exit Tool{Colors.RESET}                                      {Colors.BRIGHT_GREEN}{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}├────────────────────────────────────────────────────────────┤{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_CYAN}Status:{Colors.RESET} {logged_in_status:<48}{Colors.BRIGHT_GREEN}{Colors.RESET}")
         print(f"{Colors.BRIGHT_GREEN}│{Colors.RESET} {Colors.BRIGHT_CYAN}Token:{Colors.RESET}  {token_status:<48}{Colors.BRIGHT_GREEN}{Colors.RESET}")
@@ -1796,7 +2193,7 @@ class GitHubTool:
         
         while True:
             self.print_menu()
-            choice = self.get_input("Select an option (1-7)")
+            choice = self.get_input("Select an option (1-8)")
             
             if choice == '1':
                 self.clear_screen()
@@ -1821,8 +2218,12 @@ class GitHubTool:
             elif choice == '6':
                 self.clear_screen()
                 self.print_banner()
-                self.check_rate_limits()
+                self.handle_seed_follower_extractor_flow()
             elif choice == '7':
+                self.clear_screen()
+                self.print_banner()
+                self.check_rate_limits()
+            elif choice == '8':
                 self.clear_screen()
                 self.print_banner()
                 
@@ -1842,7 +2243,7 @@ class GitHubTool:
                 print(f"\n{Colors.DIM}Session duration: {(datetime.now() - self.session_start_time).seconds} seconds{Colors.RESET}\n")
                 break
             else:
-                self.print_error("Invalid option! Please choose 1-7.")
+                self.print_error("Invalid option! Please choose 1-8.")
             
             input(f"\n{Colors.BRIGHT_WHITE}Press Enter to continue...{Colors.RESET}")
             self.clear_screen()
